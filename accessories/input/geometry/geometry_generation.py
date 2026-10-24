@@ -5,32 +5,41 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # predefine some functions
-def surface_function(x_min, x_max, a, lambd, phi, resolution):
+def surface_function(x_0, length, a, lambd, phi, delta_x):
     """
     Function to define the surface of the critical part of the geometry.
 
-    x_min: minimum x value (m)
-    x_max: maximum x value (m)
+    x_0: initial x value (m)
+    length: length of the central part (m)
     a: amplitude of the sine wave (m)
     lambd: wavelength of the sine wave (m)
     phi: phase shift of the sine wave (rad)
-    resolution: number of points to generate along the x-axis (m)
+    delta_x: spacing between points along the x-axis (m)
     """
 
-    x = np.arange(x_min, x_max, resolution)
+    x = np.arange(0, length, delta_x)
     y = a * np.sin(2*np.pi/lambd * x + 2*np.pi*phi)
+    x = x + x_0  # shift x values to start from x_0
 
     return x, y
 
 # set parameters
+# set general geometry parameters
+x_upstream_min = 0
+length_upstream = 2.5
+length_center = 1
+length_downstream = 2.5
+y_base = 0
+height_channel = 2
 # surface function parameters
-x_min = 0
-x_max = 1
+x_0 = x_upstream_max
 a = 0.1
 lambd = 0.5
 phi = 0
-resolution = 0.01
+delta_x = 0.01
 
+# generate surface points in central part of geometry
+surface_center = np.array(surface_function(x_0, x_0 + length, a, lambd, phi, delta_x))
 
 breakpoint = 1
 
