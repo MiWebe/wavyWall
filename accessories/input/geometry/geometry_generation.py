@@ -48,6 +48,9 @@ delta_x = 0.01
 # mesh parameters
 lc_bottom = 0.01
 lc_bulk = 0.1
+extrusion_depth = 0.1
+num_layers = 1
+recombine = True  # Optional: tries to make structured prism/hex elements if possible
 # script execution parameters
 plot_bottom_control = False
 plot_full_control = False
@@ -141,9 +144,38 @@ for x,y in top_coordinates:
 
 ### make edge tags
 # bottom lines
+line_bottom = gmsh.model.geo.addBSpline(point_tags_bottom)
 # inlet lines
+line_inlet = gmsh.model.geo.addLine(point_tags_bottom[0], point_tags_top[0])
 # outlet lines
+line_outlet = gmsh.model.geo.addLine(point_tags_bottom[-1], point_tags_top[-1])
 # top lines
+line_top = gmsh.model.geo.addLine(point_tags_top[0], point_tags_top[1])
+
+### create surface
+curve_loop = gmsh.model.geo.addCurveLoop([
+    line_inlet, 
+    line_top, 
+    -line_outlet, 
+    -line_bottom
+])
+domain_surface = gmsh.model.geo.addPlaneSurface([curve_loop])
+
+gmsh.model.geo.synchronize()
+
+### extrude 2D surface to 3D volume
+extrude_out = gmsh.model.geo.extrude(
+    [(2, domain_surface)],
+    0, 0, extrusion_depth,
+    numElements=[num_layers],
+    recombine=recombine
+)
+
+gmsh.model.geo.synchronize()
+
+breakpoint = 1
+
+gmsh.fltk.run()
 
 ### make face tags
 # bottom faces
