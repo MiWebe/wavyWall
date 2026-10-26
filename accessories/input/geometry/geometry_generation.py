@@ -27,26 +27,139 @@ def surface_function(x_0, length, a, lambd, phi, delta_x):
 # set general geometry parameters
 x_upstream_min = 0
 length_upstream = 2.5
-length_center = 1
+length_center = 6
 length_downstream = 2.5
 y_base = 0
 height_channel = 2
+delta_z = 0.01
+# derived general geometry parameters
+x_upstream_max = x_upstream_min + length_upstream
+x_center_min = x_upstream_max
+x_center_max = x_center_min + length_center
+x_downstream_min = x_center_max
+x_downstream_max = x_downstream_min + length_downstream
 # surface function parameters
-x_0 = x_upstream_max
+x_0 = x_center_min
+length = length_center
 a = 0.1
 lambd = 0.5
 phi = 0
 delta_x = 0.01
+# mesh parameters
+lc_bottom = 0.01
+lc_bulk = 0.1
+# script execution parameters
+plot_bottom_control = False
+plot_full_control = False
 
+
+
+### ----- generate geometry coordinates ----- ###
+
+### bottom surface ###
 # generate surface points in central part of geometry
-surface_center = np.array(surface_function(x_0, x_0 + length, a, lambd, phi, delta_x))
+surface_center = np.array(surface_function(x_0, length, a, lambd, phi, delta_x))
 
-breakpoint = 1
+# make coordinate array for bottom surface of geometry
+bottom_coordinates = np.array([[x_upstream_min, y_base], [x_upstream_max, y_base]])
 
-# initialize gmsh
+bottom_coordinates = np.append(bottom_coordinates, surface_center.T[1:, :], axis=0)
+bottom_coordinates = np.append(bottom_coordinates, [[x_downstream_min, y_base], [x_downstream_max, y_base]], axis=0)
+
+# plot the geometry to verify that it is correct
+if plot_bottom_control == True:
+    plt.plot(bottom_coordinates.T[0, :], bottom_coordinates.T[1, :], linestyle='--', linewidth=0.6, marker='+', markersize=4)
+    plt.xlim(x_upstream_min - 0.5, x_downstream_max + 0.5)
+    plt.ylim(y_base - a - 0.5, y_base + a + 0.5)
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
+    plt.xlabel('x (m)')
+    plt.ylabel('y (m)')
+    plt.title('Bottom surface of geometry')
+    plt.show()
+
+### inlet ###
+inlet_coordinates = np.array([[x_upstream_min, y_base], [x_upstream_min, y_base + height_channel]])
+
+### outlet ###
+outlet_coordinates = np.array([[x_downstream_max, y_base], [x_downstream_max, y_base + height_channel]])
+
+### top surface ###
+top_coordinates = np.array([[x_upstream_min, y_base + height_channel], [x_downstream_max, y_base + height_channel]])
+
+### plot the geometry to verify that it is correct ###
+if plot_full_control == True:
+    # plot bottom
+    plt.plot(bottom_coordinates.T[0, :], bottom_coordinates.T[1, :], linestyle='--', linewidth=1, marker='+', markersize=4, label='bottom')
+    # plot inlet
+    plt.plot(inlet_coordinates.T[0, :], inlet_coordinates.T[1, :], linestyle='--', linewidth=1, marker='+', markersize=4, label='inlet')
+    # plot outlet
+    plt.plot(outlet_coordinates.T[0, :], outlet_coordinates.T[1, :], linestyle='--', linewidth=1, marker='+', markersize=4, label='outlet')
+    # plot top
+    plt.plot(top_coordinates.T[0, :], top_coordinates.T[1, :], linestyle='--', linewidth=1, marker='+', markersize=4, label='top')
+
+    # set plot limits and aspect ratio
+    plt.xlim(x_upstream_min - 0.5, x_downstream_max + 0.5)
+    plt.ylim(y_base - a - 0.5, y_base + height_channel + 0.5)
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
+    # set labels and title
+    plt.xlabel('x (m)')
+    plt.ylabel('y (m)')
+    plt.legend()
+    plt.title('Bottom surface of geometry')
+    plt.show()
+
+
+
+### ----- generate geometry in Gmsh ----- ###
+
+### initialize gmsh
 gmsh.initialize()
 
+###  make point tags
+# bottom surface points
+point_tags_bottom = []
+for x,y in bottom_coordinates:
+    pt = gmsh.model.geo.addPoint(x, y, 0, lc_bottom)
+    point_tags_bottom.append(pt)
+# inlet points
+point_tags_inlet = []
+for x,y in inlet_coordinates:
+    pt = gmsh.model.geo.addPoint(x, y, 0, lc_bulk)
+    point_tags_inlet.append(pt)
+# outlet points
+point_tags_outlet = []
+for x,y in outlet_coordinates:
+    pt = gmsh.model.geo.addPoint(x, y, 0, lc_bulk)
+    point_tags_outlet.append(pt)
+# top surface points
+point_tags_top = []
+for x,y in top_coordinates:
+    pt = gmsh.model.geo.addPoint(x, y, 0, lc_bulk)
+    point_tags_top.append(pt)
 
+### make edge tags
+# bottom lines
+# inlet lines
+# outlet lines
+# top lines
+
+### make face tags
+# bottom faces
+# inlet faces
+# outlet faces
+# top faces
+
+### make surface tags
+# bottom surfaces
+# inlet surfaces
+# outlet surfaces
+# top surfaces
+
+
+
+breakpoint = 1
 
 # cube points:
 lc = 1e-2
