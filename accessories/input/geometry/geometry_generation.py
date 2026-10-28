@@ -144,7 +144,15 @@ for x,y in top_coordinates:
 
 ### make edge tags
 # bottom lines
-line_bottom = gmsh.model.geo.addBSpline(point_tags_bottom)
+#line_bottom = gmsh.model.geo.addPolyline(point_tags_bottom)
+bottom_line_segments = []
+for i in range(len(point_tags_bottom) - 1):
+    p_start = point_tags_bottom[i]
+    p_end = point_tags_bottom[i+1]
+    
+    # Create a tiny line segment between every consecutive point pair
+    seg_tag = gmsh.model.geo.addLine(p_start, p_end)
+    bottom_line_segments.append(seg_tag)
 # inlet lines
 line_inlet = gmsh.model.geo.addLine(point_tags_bottom[0], point_tags_top[0])
 # outlet lines
@@ -154,10 +162,10 @@ line_top = gmsh.model.geo.addLine(point_tags_top[0], point_tags_top[1])
 
 ### create surface
 curve_loop = gmsh.model.geo.addCurveLoop([
-    line_inlet, 
-    line_top, 
-    -line_outlet, 
-    -line_bottom
+    *bottom_line_segments,
+    line_outlet,
+    -line_top,
+    -line_inlet
 ])
 domain_surface = gmsh.model.geo.addPlaneSurface([curve_loop])
 
@@ -173,9 +181,94 @@ extrude_out = gmsh.model.geo.extrude(
 
 gmsh.model.geo.synchronize()
 
+# open GMSH GUI to inspect generated geometry
+gmsh.fltk.run()
+
+
+
+### assign physical gorups
+# Extract all entities from extrusion output
+all_entities = gmsh.model.getEntities()
+volumes = [e[1] for e in all_entities if e[0] == 3]
+surfaces = [e[1] for e in all_entities if e[0] == 2]
+lines = [e[1] for e in all_entities if e[0] == 1]
+points = [e[1] for e in all_entities if e[0] == 0]
+
+# Internal Volume
+gmsh.model.addPhysicalGroup(3, volumes, name="internalMesh")
+
+# categorise surfaces via spatial querying using bounding boxes
+inlet_surfs = []
+outlet_surfs = []
+top_surfs = []
+bottom_surfs = []
+front_back_caps = []
+
+for surf in surfaces:
+    bb = gmsh.model.getBoundingBox(2, surf)
+    xmin, ymin, zmin, xmax, ymax, zmax = bb
+    
+    # Check if it's a front/back cap (sits at z = 0 or z = extrusion_depth)
+    if abs(zmax - zmin) < 1e-5:
+        front_back_caps.append(surf)
+    else:
+        # inlet
+        if abs(xmax - x_upstream_min) < 1e-5:
+            inlet_surfs.append(surf)
+        # outlet
+        elif abs(xmin - x_downstream_max) < 1e-5:
+            outlet_surfs.append(surf)
+        # channel top
+        elif abs(ymin - (y_base + height_channel)) < 1e-5:
+            top_surfs.append(surf)
+        else: # Wavy bottom wall (spans all 602 segments)
+            bottom_surfs.append(surf)
+
+# Assign physical groups to the filtered lists
+gmsh.model.addPhysicalGroup(2, inlet_surfs, name="inlet")
+gmsh.model.addPhysicalGroup(2, outlet_surfs, name="outlet")
+gmsh.model.addPhysicalGroup(2, top_surfs, name="top_wall")
+gmsh.model.addPhysicalGroup(2, bottom_surfs, name="bottom_wall")
+gmsh.model.addPhysicalGroup(2, front_back_caps, name="frontAndBack")
+
+gmsh.model.geo.synchronize()
+
+
+
+### generate mesh
+
+# set mesh options
+# set mesh algorithm for 3D meshing (1 = Delaunay, 4 = Frontal)
+gmsh.option.setNumber("Mesh.Algorithm3D", 1)
+# enable mesh optimization for high-quality elements near the wavy boundary
+gmsh.option.setNumber("Mesh.Optimize", 1)
+gmsh.option.setNumber("Mesh.OptimizeNetgen", 1)
+# set higher order elements (1 = linear, 2 = quadratic)
+gmsh.option.setNumber("Mesh.ElementOrder", 1)
+
+# actual mesh generation
+print("Generating 3D mesh...")
+gmsh.model.mesh.generate(3)
+print("3D mesh generation complete!")
+
+# open GMSH GUI to inspect generated mesh
+gmsh.fltk.run()
+
 breakpoint = 1
 
-gmsh.fltk.run()
+### Export of the mesh
+# OpenFOAM's 'gmshToFoam' utility requires the older Gmsh Version 2 ASCII format.
+# Setting version 2 explicitly prevents format compatibility errors in OpenFOAM.
+gmsh.option.setNumber("Mesh.MshFileVersion", 2.2)
+
+output_filename = "wavy_channel.msh"
+gmsh.write(output_filename)
+print(f"Mesh successfully exported to {output_filename}")
+
+# --- 11. CLEAN UP ---
+gmsh.finalize()
+
+breakpoint = 1
 
 ### make face tags
 # bottom faces
